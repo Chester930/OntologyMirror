@@ -2,3 +2,4 @@ sqlparse
 pydantic
 pydantic-settings
 gitpython
+requests
