@@ -11,20 +11,24 @@ class SchemaOrgLoader:
     Source: https://schema.org/docs/developers.html
     """
     
-    # We use the 'all' variant to cover core + all extensions (like auto, bib, etc.)
-    # Using HTTPS version as per best practice.
-    DOWNLOAD_URL = "https://schema.org/version/latest/schemaorg-all-https.jsonld"
+    # We use the 'current' variant as requested, or 'all' if needed.
+    # User specified: https://schema.org/version/latest/schemaorg-current-https.jsonld
+    DOWNLOAD_URL = "https://schema.org/version/latest/schemaorg-current-https.jsonld"
     
     def __init__(self):
         self.kb_dir = settings.DATA_DIR / "knowledge_base"
-        self.file_path = self.kb_dir / "schemaorg-all-https.jsonld"
+        self.file_path = self.kb_dir / "schemaorg-current-https.jsonld"
         self.graph: List[Dict[str, Any]] = []
         
-    def ensure_schema_loaded(self):
+    def ensure_schema_loaded(self, force_update: bool = False):
         """
         Ensures the JSON-LD file exists locally and loads it into memory.
+        
+        Args:
+            force_update (bool): If True, re-downloads the file from source.
+                                 Useful since Schema.org is continuously updated.
         """
-        if not self.file_path.exists():
+        if force_update or not self.file_path.exists():
             self._download_schema()
             
         if not self.graph:
