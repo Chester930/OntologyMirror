@@ -1,3 +1,4 @@
+sqlparse
 pydantic
 pydantic-settings
 gitpython
