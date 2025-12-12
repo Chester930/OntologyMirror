@@ -3,3 +3,10 @@ pydantic
 pydantic-settings
 gitpython
 requests
+chromadb
+langchain
+langchain-community
+tiktoken
+sentence-transformers
+langchain-openai
+langchain-google-genai
