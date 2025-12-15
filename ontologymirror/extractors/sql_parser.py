@@ -157,7 +157,7 @@ class SqlExtractor(BaseExtractor):
         upper_def = definition.upper()
         
         # Skip constraints and keys
-        skip_keywords = ["PRIMARY KEY", "FOREIGN KEY", "KEY", "INDEX", "UNIQUE", "CONSTRAINT", "FULLTEXT", "CHECK", "SPATIAL"]
+        skip_keywords = ["PRIMARY", "FOREIGN", "KEY", "INDEX", "UNIQUE", "CONSTRAINT", "FULLTEXT", "CHECK", "SPATIAL"]
         
         # Check if the instruction starts with any of these
         # Use simple string matching for checking start

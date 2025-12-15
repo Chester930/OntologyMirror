@@ -25,6 +25,17 @@ class LogicBasedMockLLM(BaseChatModel):
                 ]
             }
             """
+        elif "order" in last_message:
+            response_content = """
+            {
+                "schema_class": "Order",
+                "rationale": "Detected order-related keywords.",
+                "mappings": [
+                    {"original_name": "order_id", "schema_property": "orderNumber", "reason": "Mock logic"},
+                    {"original_name": "amount", "schema_property": "totalPaymentDue", "reason": "Mock logic"}
+                ]
+            }
+            """
         elif "user" in last_message or "auth" in last_message:
             response_content = """
             {
