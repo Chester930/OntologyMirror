@@ -90,7 +90,14 @@ async def map_tables(payload: MapRequest):
     # Note: This is inefficient (re-init mapper every time). 
     # But okay for MVP.
     
-    for t_data in payload.tables:
+    import time
+    
+    for i, t_data in enumerate(payload.tables):
+        # Throttle to respect Gemini Free Tier (15 RPM = 1 request every 4s)
+        if i > 0:
+            print(f"⏳ Throttling: Waiting 4s before mapping table {i+1}/{len(payload.tables)}...")
+            time.sleep(4)
+
         # Mocking the RawTable input reconstruction
         # We need to import RawColumn... wait, RawTable needs list of RawColumns
         from .core.domain import RawColumn
@@ -133,6 +140,35 @@ async def generate_artifacts(mapped_tables: List[Dict[str, Any]]):
         "sql": sql_out,
         "json": json_out
     }
+
+@app.get("/api/search")
+async def search_schema(query: str, limit: int = 5):
+    """
+    Searches the Schema.org vector store for relevant classes.
+    """
+    from .core.vector_store import SchemaVectorStore
+    try:
+        store = SchemaVectorStore()
+        # Ensure index exists (might need loading)
+        # Assuming index is pre-built or built on first access.
+        # Note: SchemaVectorStore constructor builds/loads.
+        
+        results = store.search(query, k=limit)
+        
+        # Format for frontend
+        return [
+            {
+                "name": doc.metadata.get("label"),
+                "description": doc.page_content, # Simplified content
+                "uri": doc.metadata.get("uri")
+            }
+            for doc in results
+        ]
+    except Exception as e:
+        # If index not found or other error
+        print(f"Search error: {e}")
+        # Return empty list or error? Empty list is safer for UI
+        return []
 
 if __name__ == "__main__":
     import uvicorn

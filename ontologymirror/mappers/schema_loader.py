@@ -17,7 +17,7 @@ class SchemaOrgLoader:
     
     def __init__(self):
         self.kb_dir = settings.DATA_DIR / "knowledge_base"
-        self.file_path = self.kb_dir / "schemaorg-current-https.jsonld"
+        self.file_path = settings.SCHEMA_ORG_DATA
         self.graph: List[Dict[str, Any]] = []
         
     def ensure_schema_loaded(self, force_update: bool = False):

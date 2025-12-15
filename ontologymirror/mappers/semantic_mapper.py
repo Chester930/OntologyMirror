@@ -18,6 +18,7 @@ class MappedTable(BaseModel):
     original_table: str
     schema_class: str     # e.g., "Person", "Organization"
     columns: List[MappedColumn]
+    confidence_score: float = 0.5
     rationale: str
 
 class SemanticMapper:
@@ -63,14 +64,21 @@ class SemanticMapper:
         system_prompt = """You are an expert Ontology Engineer. Your task is to map a legacy SQL table to a standardized Schema.org Class.
         
         Output strictly in JSON format matching this structure:
-        {
-            "schema_class": "BestMatchingClassOrNone",
-            "rationale": "Why you chose this class...",
-            "mappings": [
-                {"original_name": "col_name", "schema_property": "mappedProperty", "reason": "why"}
-            ]
-        }
-        """
+            {
+                "schema_class": "Person",
+                "rationale": "The table stores user credentials and profile info.",
+                "confidence_score": 0.95,
+                "mappings": [
+                    {"original_name": "username", "schema_property": "alternateName", "reason": "Matches alias concept"},
+                    ...
+                ]
+            }
+            
+            Key Rules:
+            1. 'schema_class' must be one of the Candidates provided below, or 'Thing' if none match.
+            2. 'confidence_score' should be a float between 0.0 and 1.0 reflecting your certainty.
+            3. If confidence is low (< 0.6), explain why in 'rationale'.
+            """
         
         # Serialize input data for the prompt
         table_def = {
@@ -112,8 +120,8 @@ class SemanticMapper:
             for m in data.get("mappings", []):
                 mapped_cols.append(MappedColumn(
                     original_name=m["original_name"],
-                    schema_property=m["schema_property"],
-                    confidence=0.9, # Mock confidence
+                    schema_property=m.get("schema_property") or "identifier", # Fallback to identifier if null
+                    confidence=0.9, # Local column confidence not yet in prompt, keeping mock
                     reason=m.get("reason", "")
                 ))
                 
@@ -121,6 +129,7 @@ class SemanticMapper:
                 original_table=table.name,
                 schema_class=data.get("schema_class", "Thing"),
                 columns=mapped_cols,
+                confidence_score=data.get("confidence_score", 0.5), # Capture AI confidence
                 rationale=data.get("rationale", "")
             )
             

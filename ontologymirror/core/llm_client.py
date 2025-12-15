@@ -60,11 +60,29 @@ class LLMClient:
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """
-        Simple generation method.
+        Simple generation method with retry logic for Rate Limits.
         """
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
-        response = self.model.invoke(messages)
-        return response.content
+        from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+        
+        # Define retry wrapper dynamically to capture self if needed, 
+        # but for simplicity we can just use a local function or the library directly.
+        
+        @retry(
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=2, min=5, max=70),
+            reraise=True
+        )
+        def _invoke_with_retry():
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt)
+            ]
+            # Use invoke which is standard in newer LangChain
+            return self.model.invoke(messages)
+
+        try:
+            response = _invoke_with_retry()
+            return response.content
+        except Exception as e:
+            print(f"❌ LLM Generation failed after retries: {e}")
+            raise e

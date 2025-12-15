@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     DATA_DIR: Path = BASE_DIR / "data"
     REPOS_DIR: Path = DATA_DIR / "raw_repos"
+    SCHEMA_ORG_DATA: Path = DATA_DIR / "knowledge_base" / "schemaorg-current-https.jsonld"
     
     # LLM Settings
     OPENAI_API_KEY: str | None = None

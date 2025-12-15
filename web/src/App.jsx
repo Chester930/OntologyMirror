@@ -114,12 +114,117 @@ function App() {
     }
   };
 
+  // --- New Logic for Human-in-the-loop ---
+  const [editTableIndex, setEditTableIndex] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const openEditModal = (idx) => {
+    setEditTableIndex(idx);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const closeEditModal = () => {
+    setEditTableIndex(null);
+  };
+
+  const handleSearch = async (e) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    if (q.length < 2) return;
+
+    setIsSearching(true);
+    try {
+      const res = await fetch(`${API_URL}/api/search?query=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setSearchResults(data);
+    } catch (err) {
+      console.error(err);
+    }
+    setIsSearching(false);
+  };
+
+  const applyEdit = (newClass) => {
+    const updated = [...mappedTables];
+    updated[editTableIndex] = {
+      ...updated[editTableIndex],
+      schema_class: newClass.name,
+      rationale: `Manual override by user. (Selected: ${newClass.name})`,
+      confidence_score: 1.0 // User is always right
+    };
+    setMappedTables(updated);
+    closeEditModal();
+  };
+
+  const ConfidenceBadge = ({ score }) => {
+    // Default to 0.5 if score is missing
+    const s = score !== undefined ? score : 0.5;
+    let color = "#ef4444"; // red
+    let text = "低信心";
+    if (s >= 0.8) {
+      color = "#22c55e"; // green
+      text = "高信心";
+    } else if (s >= 0.6) {
+      color = "#eab308"; // yellow
+      text = "普通";
+    }
+
+    return (
+      <span style={{
+        backgroundColor: color,
+        color: '#000',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        fontSize: '0.75rem',
+        fontWeight: 'bold',
+        marginLeft: '8px'
+      }}>
+        {text} ({Math.round(s * 100)}%)
+      </span>
+    );
+  };
+
   return (
     <div className="container">
       <header className="header">
         <h1>OntologyMirror <span className="version">v0.1</span></h1>
         <p>AI 驅動的 schema.org 語意映射工具</p>
       </header>
+
+      {/* Edit Modal */}
+      {editTableIndex !== null && (
+        <div className="modal-overlay">
+          <div className="modal-content glass">
+            <h3>搜尋 Schema.org 類別</h3>
+            <p>正在修正：<strong>{mappedTables[editTableIndex].original_table}</strong></p>
+
+            <input
+              type="text"
+              placeholder="輸入關鍵字 (例如: Person, Event...)"
+              value={searchQuery}
+              onChange={handleSearch}
+              autoFocus
+              className="search-input"
+            />
+
+            <div className="search-results">
+              {isSearching && <div className="spinner">搜尋中...</div>}
+              {searchResults.map((r, i) => (
+                <div key={i} className="search-item" onClick={() => applyEdit(r)}>
+                  <div className="search-item-title">{r.name}</div>
+                  <div className="search-item-desc">{r.description?.substring(0, 100)}...</div>
+                </div>
+              ))}
+            </div>
+
+            <button className="btn-secondary" onClick={closeEditModal} style={{ marginTop: '1rem' }}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card glass">
         {loading && <div className="loader">處理中... AI 正在思考 🧠</div>}
@@ -150,22 +255,37 @@ function App() {
 
         {!loading && step === 3 && (
           <div className="result-zone">
-            <h2>步驟 3: 映射結果</h2>
+            <h2>步驟 3: 映射結果與微調</h2>
 
             {!finalOutput ? (
               <div>
                 <div className="mapping-grid">
                   {mappedTables.map((m, idx) => (
                     <div key={idx} className="mapping-card">
-                      <div className="left">{m.original_table}</div>
-                      <div className="arrow">➡️</div>
-                      <div className="right neon-text">{m.schema_class}</div>
+                      <div className="card-header">
+                        <div className="left">
+                          {m.original_table}
+                        </div>
+                        <div className="right-group">
+                          <div className="arrow">➡️</div>
+                          <div className="right neon-text">{m.schema_class}</div>
+                          <ConfidenceBadge score={m.confidence_score} />
+                        </div>
+                      </div>
+
                       <p className="rationale">"{m.rationale}"</p>
+
+                      <button
+                        className="btn-edit"
+                        onClick={() => openEditModal(idx)}
+                      >
+                        ✏️ 修正映射
+                      </button>
                     </div>
                   ))}
                 </div>
-                <button className="btn-primary" onClick={handleGenerate}>
-                  生成 SQL 與報告 🚀
+                <button className="btn-primary" onClick={handleGenerate} style={{ marginTop: '20px' }}>
+                  確認無誤，生成報告 🚀
                 </button>
               </div>
             ) : (
