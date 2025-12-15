@@ -10,3 +10,6 @@ tiktoken
 sentence-transformers
 langchain-openai
 langchain-google-genai
+fastapi
+uvicorn
+python-multipart
