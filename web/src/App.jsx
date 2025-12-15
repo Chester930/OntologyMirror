@@ -79,22 +79,32 @@ function App() {
       return;
     }
     try {
-      // 1. Ask user to pick a folder
-      const dirHandle = await window.showDirectoryPicker();
+      // 1. Prepare default folder name
+      const baseName = fileName.replace(/\.[^/.]+$/, ""); // remove extension
+      const defaultFolderName = `${baseName}_mapped`;
 
-      // 2. Save SQL file
-      const sqlHandle = await dirHandle.getFileHandle("schema_mapped.sql", { create: true });
+      const folderName = prompt("請確認要建立的資料夾名稱：", defaultFolderName);
+      if (!folderName) return; // User cancelled prompt
+
+      // 2. Ask user to pick the PARENT folder
+      const parentDirHandle = await window.showDirectoryPicker();
+
+      // 3. Create the subfolder
+      const subDirHandle = await parentDirHandle.getDirectoryHandle(folderName, { create: true });
+
+      // 4. Save SQL file in subfolder
+      const sqlHandle = await subDirHandle.getFileHandle("schema_mapped.sql", { create: true });
       const sqlWritable = await sqlHandle.createWritable();
       await sqlWritable.write(finalOutput.sql);
       await sqlWritable.close();
 
-      // 3. Save JSON report
-      const jsonHandle = await dirHandle.getFileHandle("mapping_report.json", { create: true });
+      // 5. Save JSON report in subfolder
+      const jsonHandle = await subDirHandle.getFileHandle("mapping_report.json", { create: true });
       const jsonWritable = await jsonHandle.createWritable();
       await jsonWritable.write(finalOutput.json);
       await jsonWritable.close();
 
-      alert("✅ 匯出成功！檔案已儲存至您選擇的資料夾。");
+      alert(`✅ 匯出成功！\n檔案已儲存至：${parentDirHandle.name}/${folderName}`);
     } catch (err) {
       console.error(err);
       // Ignore cancellation errors
