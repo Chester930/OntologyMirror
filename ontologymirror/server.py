@@ -92,16 +92,11 @@ async def map_tables(payload: MapRequest):
     
     import time
     
-    for i, t_data in enumerate(payload.tables):
-        # Throttle to respect Gemini Free Tier (15 RPM = 1 request every 4s)
-        if i > 0:
-            print(f"⏳ Throttling: Waiting 4s before mapping table {i+1}/{len(payload.tables)}...")
-            time.sleep(4)
-
-        # Mocking the RawTable input reconstruction
-        # We need to import RawColumn... wait, RawTable needs list of RawColumns
-        from .core.domain import RawColumn
-        
+    # Reconstruct all RawTable objects first
+    from .core.domain import RawColumn
+    
+    all_raw_tables = []
+    for t_data in payload.tables:
         cols = [RawColumn(name=c['name'], original_type=c['type']) for c in t_data.get('columns', [])]
         raw_table = RawTable(
             name=t_data['name'],
@@ -109,9 +104,22 @@ async def map_tables(payload: MapRequest):
             source_file="api_upload",
             raw_content=t_data.get('raw_content')
         )
+        all_raw_tables.append(raw_table)
         
-        mapping_result = mapper.map_table(raw_table)
-        results.append(mapping_result.dict()) # Pydantic v1/v2 export
+    # Batch Processing
+    BATCH_SIZE = 5
+    results = []
+    
+    for i in range(0, len(all_raw_tables), BATCH_SIZE):
+        batch = all_raw_tables[i:i + BATCH_SIZE]
+        print(f"🚀 Processing Batch {i//BATCH_SIZE + 1} ({len(batch)} tables)...")
+        
+        # Throttle between batches if needed (2s is safe)
+        if i > 0:
+            time.sleep(2)
+            
+        batch_results = mapper.map_table_batch(batch)
+        results.extend([res.dict() for res in batch_results])
         
     return results
 

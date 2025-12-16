@@ -12,6 +12,7 @@ class MappedColumn(BaseModel):
     schema_property: str  # e.g., "email", "givenName"
     confidence: float
     reason: str
+    search_keywords: List[str] = []
 
 class MappedTable(BaseModel):
     """Represents the final mapping decision for a table."""
@@ -20,6 +21,7 @@ class MappedTable(BaseModel):
     columns: List[MappedColumn]
     confidence_score: float = 0.5
     rationale: str
+    search_keywords: List[str] = []
 
 class SemanticMapper:
     """
@@ -68,16 +70,25 @@ class SemanticMapper:
                 "schema_class": "Person",
                 "rationale": "The table stores user credentials and profile info.",
                 "confidence_score": 0.95,
+                "search_keywords": ["Person", "User", "Account"],
                 "mappings": [
-                    {"original_name": "username", "schema_property": "alternateName", "reason": "Matches alias concept"},
+                    {
+                        "original_name": "username", 
+                        "schema_property": "alternateName", 
+                        "confidence": 0.9,
+                        "reason": "Matches alias concept",
+                        "search_keywords": ["alias", "handle", "nickname"]
+                    },
                     ...
                 ]
             }
             
             Key Rules:
             1. 'schema_class' must be one of the Candidates provided below, or 'Thing' if none match.
-            2. 'confidence_score' should be a float between 0.0 and 1.0 reflecting your certainty.
-            3. If confidence is low (< 0.6), explain why in 'rationale'.
+            2. 'confidence_score' should be a float between 0.0 and 1.0 reflecting your certainty about the CLASS mapping.
+            3. 'confidence' in mappings is for the PROPERTY mapping (0.0 - 1.0).
+            4. If sure, use high confidence (> 0.8). If unsure, use lower confidence (< 0.6).
+            5. ALWAYS provide 'search_keywords' (synonyms, related terms) especially if confidence is low, to help human reviewers find the right match.
             """
         
         # Serialize input data for the prompt
@@ -98,6 +109,7 @@ class SemanticMapper:
         2. If none are good matches, use "Thing" or "None".
         3. Map each column in the Input Table to a valid property of that Class.
         4. If a column has no semantic equivalent (e.g. internal DB IDs), map it to "identifier" or leave blank/null.
+        5. PROVIDE CONFIDENCE SCORES and SEARCH KEYWORDS for both the class and each property.
         """
         
         # 3. Call LLM
@@ -121,8 +133,9 @@ class SemanticMapper:
                 mapped_cols.append(MappedColumn(
                     original_name=m["original_name"],
                     schema_property=m.get("schema_property") or "identifier", # Fallback to identifier if null
-                    confidence=0.9, # Local column confidence not yet in prompt, keeping mock
-                    reason=m.get("reason", "")
+                    confidence=m.get("confidence", 0.5), # Dynamic confidence
+                    reason=m.get("reason", ""),
+                    search_keywords=m.get("search_keywords", [])
                 ))
                 
             return MappedTable(
@@ -130,7 +143,8 @@ class SemanticMapper:
                 schema_class=data.get("schema_class", "Thing"),
                 columns=mapped_cols,
                 confidence_score=data.get("confidence_score", 0.5), # Capture AI confidence
-                rationale=data.get("rationale", "")
+                rationale=data.get("rationale", ""),
+                search_keywords=data.get("search_keywords", [])
             )
             
         except json.JSONDecodeError:
