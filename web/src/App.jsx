@@ -209,6 +209,42 @@ function App() {
               className="search-input"
             />
 
+            {/* AI Search Keywords Suggestions */}
+            {mappedTables[editTableIndex]?.search_keywords?.length > 0 && (
+              <div className="keyword-suggestions" style={{ marginTop: '0.5rem', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8', alignSelf: 'center' }}>AI 建議關鍵字:</span>
+                {mappedTables[editTableIndex].search_keywords.map((kw, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setSearchQuery(kw);
+                      // Trigger search immediately
+                      setIsSearching(true);
+                      fetch(`${API_URL}/api/search?query=${encodeURIComponent(kw)}`)
+                        .then(res => res.json())
+                        .then(data => setSearchResults(data))
+                        .catch(console.error)
+                        .finally(() => setIsSearching(false));
+                    }}
+                    style={{
+                      backgroundColor: '#3b82f6',
+                      border: 'none',
+                      borderRadius: '12px',
+                      color: 'white',
+                      padding: '2px 10px',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                  >
+                    {kw}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="search-results">
               {isSearching && <div className="spinner">搜尋中...</div>}
               {searchResults.map((r, i) => (
