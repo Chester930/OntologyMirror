@@ -152,7 +152,19 @@ function App() {
       ...updated[editTableIndex],
       schema_class: newClass.name,
       rationale: `Manual override by user. (Selected: ${newClass.name})`,
-      confidence_score: 1.0 // User is always right
+      verification_status: 'CORRECTED'
+      // confidence_score kept as original (mock/old value) or should we set it to null?
+      // User said "keep original standard", so we leave it untouched.
+    };
+    setMappedTables(updated);
+    closeEditModal();
+  };
+
+  const updateStatus = (status) => {
+    const updated = [...mappedTables];
+    updated[editTableIndex] = {
+      ...updated[editTableIndex],
+      verification_status: status
     };
     setMappedTables(updated);
     closeEditModal();
@@ -248,9 +260,34 @@ function App() {
             <div className="search-results">
               {isSearching && <div className="spinner">搜尋中...</div>}
               {searchResults.map((r, i) => (
-                <div key={i} className="search-item" onClick={() => applyEdit(r)}>
-                  <div className="search-item-title">{r.name}</div>
-                  <div className="search-item-desc">{r.description?.substring(0, 100)}...</div>
+                <div key={i} className="search-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => applyEdit(r)}>
+                    <div className="search-item-title">{r.name}</div>
+                    <div className="search-item-desc">
+                      {r.translated_description ? (
+                        <span style={{ color: '#86efac' }}>{r.translated_description}</span>
+                      ) : (
+                        <span>{r.description?.substring(0, 120)}...</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Call translate API
+                      fetch(`${API_URL}/api/translate?text=${encodeURIComponent(r.description || "")}`)
+                        .then(res => res.json())
+                        .then(data => {
+                          const newResults = [...searchResults];
+                          newResults[i].translated_description = data.translated;
+                          setSearchResults(newResults);
+                        });
+                    }}
+                    style={{ background: 'transparent', border: '1px solid #555', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', marginLeft: '10px' }}
+                    title="翻譯成中文"
+                  >
+                    🌐
+                  </button>
                 </div>
               ))}
             </div>
@@ -258,6 +295,15 @@ function App() {
             <button className="btn-secondary" onClick={closeEditModal} style={{ marginTop: '1rem' }}>
               取消
             </button>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid #333', paddingTop: '1rem' }}>
+              <h4>其他狀態標記</h4>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button className="btn-secondary" onClick={() => updateStatus('VERIFIED')} style={{ backgroundColor: '#22c55e', color: 'black' }}>✅ 確認無誤</button>
+                <button className="btn-secondary" onClick={() => updateStatus('FLAGGED')} style={{ backgroundColor: '#f59e0b', color: 'black' }}>🚩 標記問題</button>
+                <button className="btn-secondary" onClick={() => updateStatus('AI_GENERATED')}>🔄 重置狀態</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -305,6 +351,20 @@ function App() {
                         <div className="right-group">
                           <div className="arrow">➡️</div>
                           <div className="right neon-text">{m.schema_class}</div>
+                          {/* Status Badge */}
+                          {m.verification_status && m.verification_status !== "AI_GENERATED" && (
+                            <span className="status-badge" style={{
+                              backgroundColor: m.verification_status === 'VERIFIED' ? '#22c55e' : (m.verification_status === 'CORRECTED' ? '#3b82f6' : '#f59e0b'),
+                              color: '#000',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              marginLeft: '8px'
+                            }}>
+                              {m.verification_status === 'VERIFIED' ? '已確認' : (m.verification_status === 'CORRECTED' ? '已修正' : '待確認')}
+                            </span>
+                          )}
                           <ConfidenceBadge score={m.confidence_score} />
                         </div>
                       </div>
@@ -315,7 +375,7 @@ function App() {
                         className="btn-edit"
                         onClick={() => openEditModal(idx)}
                       >
-                        ✏️ 修正映射
+                        ✏️ 修正 / 確認狀態
                       </button>
                     </div>
                   ))}

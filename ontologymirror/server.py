@@ -178,6 +178,21 @@ async def search_schema(query: str, limit: int = 5):
         # Return empty list or error? Empty list is safer for UI
         return []
 
+@app.get("/api/translate")
+def translate_text(text: str):
+    """
+    Translates English text to Traditional Chinese using Google Translate (non-LLM).
+    """
+    from deep_translator import GoogleTranslator
+    try:
+        # Use zh-TW for Traditional Chinese
+        translator = GoogleTranslator(source='auto', target='zh-TW')
+        translated = translator.translate(text)
+        return {"original": text, "translated": translated}
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return {"original": text, "translated": "翻譯失敗 (請稍後再試)"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

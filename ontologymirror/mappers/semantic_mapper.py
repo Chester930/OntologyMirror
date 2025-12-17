@@ -22,6 +22,7 @@ class MappedTable(BaseModel):
     confidence_score: float = 0.5
     rationale: str
     search_keywords: List[str] = []
+    verification_status: str = "AI_GENERATED" # Options: AI_GENERATED, VERIFIED, CORRECTED, FLAGGED
 
 class SemanticMapper:
     """
@@ -89,6 +90,7 @@ class SemanticMapper:
             3. 'confidence' in mappings is for the PROPERTY mapping (0.0 - 1.0).
             4. If sure, use high confidence (> 0.8). If unsure, use lower confidence (< 0.6).
             5. ALWAYS provide 'search_keywords' (synonyms, related terms) especially if confidence is low, to help human reviewers find the right match.
+            6. The "rationale" and "reason" fields MUST be written in Traditional Chinese (繁體中文).
             """
         
         # Serialize input data for the prompt
@@ -197,6 +199,7 @@ class SemanticMapper:
         2. Use the provided 'candidate_classes' for each table as the primary choices.
         3. Assign confidence scores and search keywords as previously defined.
         4. If a mapping is low confidence, ensure 'search_keywords' are populated.
+        5. The "rationale" and "reason" fields MUST be written in Traditional Chinese (繁體中文).
         """
         
         user_prompt = f"""
