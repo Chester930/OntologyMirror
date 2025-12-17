@@ -152,3 +152,102 @@ class SemanticMapper:
             # Return empty/error object
             return MappedTable(original_table=table.name, schema_class="Error", columns=[], rationale="Parsing Failed")
 
+    def map_table_batch(self, tables: List[RawTable]) -> List[MappedTable]:
+        """
+        Maps multiple tables in a single LLM call to improve performance and reduce API requests.
+        Recommended batch size: 5-10.
+        """
+        print(f"📦 Batch Mapping {len(tables)} tables...")
+        
+        # 1. Prepare Tables Context (with RAG candidates for each)
+        batch_context = []
+        for table in tables:
+            # Retrieve candidates for this specific table
+            query = f"Table {table.name} with columns: {', '.join([c.name for c in table.columns])}"
+            candidates_docs = self.vector_store.search(query, k=3)
+            candidates = [doc.metadata.get("label") for doc in candidates_docs]
+            
+            batch_context.append({
+                "table_name": table.name,
+                "columns": [{"name": c.name, "type": c.original_type} for c in table.columns],
+                "candidate_classes": candidates
+            })
+
+        # 2. Construct Prompt
+        system_prompt = """You are an expert Ontology Engineer. Map the provided list of SQL tables to Schema.org.
+        
+        Output strictly a JSON LIST of objects, where each object matches this structure:
+        [
+            {
+                "original_table": "table_name",
+                "schema_class": "Person",
+                "rationale": "...",
+                "confidence_score": 0.95,
+                "search_keywords": ["Person", ...],
+                "mappings": [
+                     {"original_name": "col1", "schema_property": "prop1", "confidence": 0.9, ...},
+                     ...
+                ]
+            },
+            ...
+        ]
+        
+        Key Rules:
+        1. Process ALL input tables. The output list length must match input.
+        2. Use the provided 'candidate_classes' for each table as the primary choices.
+        3. Assign confidence scores and search keywords as previously defined.
+        4. If a mapping is low confidence, ensure 'search_keywords' are populated.
+        """
+        
+        user_prompt = f"""
+        INPUT BATCH TABLES:
+        {json.dumps(batch_context, indent=2)}
+        
+        INSTRUCTIONS:
+        Map every table in the input list to its best Schema.org Class and Properties.
+        Return a JSON List.
+        """
+        
+        # 3. Call LLM
+        response_text = self.llm.generate(system_prompt, user_prompt)
+        
+        # 4. Parse Response
+        try:
+            clean_json = response_text.replace("```json", "").replace("```", "").strip()
+            data_list = json.loads(clean_json)
+            
+            results = []
+            
+            for item in data_list:
+                mapped_cols = []
+                for m in item.get("mappings", []):
+                    mapped_cols.append(MappedColumn(
+                        original_name=m["original_name"],
+                        schema_property=m.get("schema_property") or "identifier",
+                        confidence=m.get("confidence", 0.5),
+                        reason=m.get("reason", ""),
+                        search_keywords=m.get("search_keywords", [])
+                    ))
+                
+                results.append(MappedTable(
+                    original_table=item.get("original_table") or "Unknown",
+                    schema_class=item.get("schema_class", "Thing"),
+                    columns=mapped_cols,
+                    confidence_score=item.get("confidence_score", 0.5),
+                    rationale=item.get("rationale", ""),
+                    search_keywords=item.get("search_keywords", [])
+                ))
+            
+            return results
+
+        except json.JSONDecodeError:
+            print(f"❌ Batch LLM Output was not valid JSON: {response_text[:100]}...")
+            return [
+                MappedTable(
+                    original_table=t.name, 
+                    schema_class="Error", 
+                    columns=[], 
+                    rationale="Batch Processing Failed"
+                ) for t in tables
+            ]
+
