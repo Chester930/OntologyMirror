@@ -16,3 +16,6 @@ python-multipart
 python-dotenv
 tenacity
 deep-translator
+sqlalchemy
+psycopg2-binary
+pymysql
